@@ -507,6 +507,27 @@ input,select,textarea{
     color:#2F6542;
 }
 
+.pet-details{
+    display:flex;
+    gap:30px;
+    align-items:flex-start;
+    flex-wrap:wrap;
+}
+.pet-details img{width:400px;
+    height:350px;
+    object-fit:cover;
+    border-radius:10px;
+}
+.info{
+    flex:1;
+}
+.info h2{
+    margin-bottom:15px;
+}
+.info p{
+    margin-bottom:12px;
+}
+
 /* View Button */
 
 .view-btn{
