@@ -1,270 +1,681 @@
-<?php
-session_start();
-include("../database.php");
+<?php 
 
-// Check login
-if(!isset($_SESSION['user_id']))
-{
-    header("Location: ../login.php");
-    exit();
-}
+session_start(); 
 
-// Only users
-if($_SESSION['role'] != "user")
-{
-    header("Location: ../login.php");
-    exit();
-}
+include("../database.php"); 
 
-$user_id = $_SESSION['user_id'];
+ 
 
-$sql = "SELECT
-            adoption_requests.*,
-            pets.pet_name,
-            pets.species,
-            pets.breed,
-            pets.weight,
-            pets.image,
-            adoption_documents.document_id,
-            adoption_documents.id_picture,
-            adoption_documents.id_copy
-        FROM adoption_requests
-        INNER JOIN pets
-        ON adoption_requests.pet_id = pets.pet_id
-        LEFT JOIN adoption_documents
-        ON adoption_requests.request_id = adoption_documents.request_id
-        WHERE adoption_requests.user_id = ?
-        ORDER BY adoption_requests.request_date DESC";
+// Check login 
 
-$stmt = mysqli_prepare($conn, $sql);
-mysqli_stmt_bind_param($stmt, "i", $user_id);
-mysqli_stmt_execute($stmt);
-$result = mysqli_stmt_get_result($stmt);
-?>
+if(!isset($_SESSION['user_id'])) 
 
-<!DOCTYPE html>
-<html>
+{ 
 
-<head>
+    header("Location: ../login.php"); 
 
-<title>My Adoption Requests</title>
+    exit(); 
 
-<link rel="stylesheet" href="../style.css">
+} 
 
-</head>
+ 
 
-<body>
+// Only users 
 
-<header>
+if(!isset($_SESSION['role']) || $_SESSION['role'] != "user") 
 
-<div class="navbar">
+{ 
 
-<div class="logo">
+    header("Location: ../login.php"); 
 
-<i class="fa-solid fa-paw"></i>
+    exit(); 
 
-<h2>PawConnect</h2>
+} 
 
-</div>
+ 
 
-<nav>
+$user_id = $_SESSION['user_id']; 
 
-<a href="../index.php">Home</a>
-<a href="../available_pets.php">Available Pets</a>
-<a href="dashboard.php">Dashboard</a>
-<a href="profile.php">Profile</a>
-<a href="../logout.php">Logout</a>
+ 
 
-</nav>
+$sql = "SELECT 
 
-</header>
+            adoption_requests.*, 
 
-<div class="container">
+            pets.pet_name, 
 
-<div class="card">
+            pets.species, 
 
-<h2>My Adoption Requests</h2>
+            pets.breed, 
 
-<br>
+            pets.weight, 
 
-<?php
-if(isset($_GET['upload_success']))
-{
-    echo "<div class='alert alert-success'>Your verification documents were uploaded successfully.</div>";
-}
+            pets.image, 
 
-if(isset($_GET['upload_error']))
-{
-    echo "<div class='alert alert-error'>" . htmlspecialchars($_GET['upload_error']) . "</div>";
-}
-?>
+            adoption_documents.document_id, 
 
-<?php
+            adoption_documents.id_picture, 
 
-if(mysqli_num_rows($result)>0)
-{
+            adoption_documents.id_copy 
 
-?>
+        FROM adoption_requests 
 
-<table>
+        INNER JOIN pets 
 
-<tr>
+        ON adoption_requests.pet_id = pets.pet_id 
 
-<th>Image</th>
-<th>Pet</th>
-<th>Species</th>
-<th>Breed</th>
-<th>Weight</th>
-<th>Request Date</th>
-<th>Reason for Adoption</th>
-<th>Status</th>
-<th>Verification Documents</th>
-<th>Assessment</th>
+        LEFT JOIN adoption_documents 
 
-</tr>
+        ON adoption_requests.request_id = adoption_documents.request_id 
 
-<?php
+        WHERE adoption_requests.user_id = ? 
 
-while($row=mysqli_fetch_assoc($result))
-{
+        ORDER BY adoption_requests.request_date DESC"; 
 
-    $has_documents = !empty($row['document_id']);
+ 
 
-?>
+$stmt = mysqli_prepare($conn, $sql); 
 
-<tr>
+mysqli_stmt_bind_param($stmt, "i", $user_id); 
 
-<td>
+mysqli_stmt_execute($stmt); 
 
-<img src="../uploads/<?php echo htmlspecialchars($row['image']); ?>">
+$result = mysqli_stmt_get_result($stmt); 
 
-</td>
+?> 
 
-<td>
+ 
 
-<?php echo htmlspecialchars($row['pet_name']); ?>
+<!DOCTYPE html> 
 
-</td>
+<html> 
 
-<td>
+<head> 
 
-<?php echo htmlspecialchars($row['species']); ?>
+    <title>My Adoption Requests</title> 
 
-</td>
+    <link rel="stylesheet" href="../style.css"> 
 
-<td>
+    <style> 
 
-<?php echo htmlspecialchars($row['breed']); ?>
+        .status-popup-btn { 
 
-</td>
+            background: none; 
 
-<td>
+            border: none; 
 
-<?php echo $row['weight'] !== null ? htmlspecialchars($row['weight']) . " kg" : "N/A"; ?>
+            padding: 0; 
 
-</td>
+            cursor: pointer; 
 
-<td>
+            font-weight: bold; 
 
-<?php echo $row['request_date']; ?>
+            text-decoration: underline; 
 
-</td>
+            font-size: 14px; 
 
-<td>
+        } 
 
-<?php echo nl2br(htmlspecialchars($row['reason_for_adoption'])); ?>
+ 
 
-</td>
+        .status-popup-btn.approved { 
 
-<td>
+            color: #2e7d32; 
 
-<?php
+        } 
 
-if($row['status']=="Pending")
-{
-    echo "<span class='status pending'>Pending</span>";
-}
-elseif($row['status']=="Approved")
-{
-    echo "<span class='status approved'>Approved</span>";
-}
-else
-{
-    echo "<span class='status rejected'>Rejected</span>";
-}
+ 
 
-?>
+        .status-popup-btn.rejected { 
 
-</td>
+            color: #c62828; 
 
-<td>
+        } 
 
-<?php if($has_documents): ?>
+ 
 
-    <span class="doc-status doc-submitted">Submitted</span>
+        .modal { 
 
-<?php else: ?>
+            display: none; 
 
-    <span class="doc-status doc-missing">Not Submitted</span>
+            position: fixed; 
 
-<?php endif; ?>
+            z-index: 9999; 
 
-<?php if($row['status'] == "Pending"): ?>
+            left: 0; 
 
-    <br>
+            top: 0; 
 
-    <a class="upload-btn" href="upload_form.php?request_id=<?php echo $row['request_id']; ?>">
-        <?php echo $has_documents ? "Update Documents" : "Upload Documents"; ?>
-    </a>
+            width: 100%; 
 
-<?php endif; ?>
+            height: 100%; 
 
-</td>
+            overflow: auto; 
 
-<td>
+            background: rgba(0,0,0,0.6); 
 
-<a class="upload-btn" href="view_assessment.php?request_id=<?php echo $row['request_id']; ?>">View Assessment</a>
+        } 
 
-</td>
+ 
 
-</tr>
+        .modal-content { 
 
-<?php
+            background: #fff; 
 
-}
+            margin: 8% auto; 
 
-?>
+            padding: 25px; 
 
-</table>
+            border-radius: 12px; 
 
-<?php
+            width: 90%; 
 
-}
-else
-{
+            max-width: 520px; 
 
-echo "<h3>You haven't submitted any adoption requests yet.</h3>";
+            position: relative; 
 
-echo "<br>";
+            box-shadow: 0 8px 30px rgba(0,0,0,0.2); 
 
-echo "<a href='../available_pets.php' class='btn'>Browse Pets</a>";
+            text-align: center; 
 
-}
+        } 
 
-?>
+ 
 
-</div>
+        .close-modal { 
 
-</div>
+            position: absolute; 
 
-<footer>
+            top: 12px; 
 
-<p>© PawConnect</p>
+            right: 16px; 
 
-</footer>
+            font-size: 24px; 
 
+            cursor: pointer; 
 
+            color: #333; 
 
-</body>
+        } 
 
-</html>
+ 
+
+        .modal-icon { 
+
+            font-size: 55px; 
+
+            margin-bottom: 10px; 
+
+        } 
+
+ 
+
+        .modal-title { 
+
+            margin-bottom: 10px; 
+
+        } 
+
+ 
+
+        .modal-message { 
+
+            margin-top: 10px; 
+
+            line-height: 1.6; 
+
+        } 
+
+ 
+
+        .modal-actions { 
+
+            margin-top: 20px; 
+
+        } 
+
+    </style> 
+
+</head> 
+
+ 
+
+<body> 
+
+ 
+
+<header> 
+
+<div class="navbar"> 
+
+    <div class="logo"> 
+
+        <i class="fa-solid fa-paw"></i> 
+
+        <h2>PawConnect</h2> 
+
+    </div> 
+
+ 
+
+    <nav> 
+
+        <a href="../index.php">Home</a> 
+
+        <a href="../available_pets.php">Available Pets</a> 
+
+        <a href="dashboard.php">Dashboard</a> 
+
+        <a href="profile.php">Profile</a> 
+
+        <a href="../logout.php">Logout</a> 
+
+    </nav> 
+
+</div> 
+
+</header> 
+
+ 
+
+<div class="container"> 
+
+    <div class="card"> 
+
+        <h2>My Adoption Requests</h2> 
+
+        <br> 
+
+ 
+
+        <?php 
+
+        if(isset($_GET['upload_success'])) 
+
+        { 
+
+            echo "<div class='alert alert-success'>Your verification documents were uploaded successfully.</div>"; 
+
+        } 
+
+ 
+
+        if(isset($_GET['upload_error'])) 
+
+        { 
+
+            echo "<div class='alert alert-error'>" . htmlspecialchars($_GET['upload_error']) . "</div>"; 
+
+        } 
+
+        ?> 
+
+ 
+
+        <?php if(mysqli_num_rows($result) > 0): ?> 
+
+        <table> 
+
+            <tr> 
+
+                <th>Image</th> 
+
+                <th>Pet</th> 
+
+                <th>Species</th> 
+
+                <th>Breed</th> 
+
+                <th>Weight</th> 
+
+                <th>Request Date</th> 
+
+                <th>Reason for Adoption</th> 
+
+                <th>Status</th> 
+
+                <th>Verification Documents</th> 
+
+                <th>Assessment</th> 
+
+            </tr> 
+
+ 
+
+            <?php while($row = mysqli_fetch_assoc($result)): ?> 
+
+                <?php 
+
+                    $has_documents = !empty($row['document_id']); 
+
+                    $status = $row['status']; 
+
+                    $admin_feedback = $row['admin_feedback'] ?? ''; 
+
+                ?> 
+
+                <tr> 
+
+                    <td> 
+
+                        <img src="../uploads/<?php echo htmlspecialchars($row['image']); ?>" alt="Pet Image"> 
+
+                    </td> 
+
+ 
+
+                    <td><?php echo htmlspecialchars($row['pet_name']); ?></td> 
+
+                    <td><?php echo htmlspecialchars($row['species']); ?></td> 
+
+                    <td><?php echo htmlspecialchars($row['breed']); ?></td> 
+
+                    <td><?php echo $row['weight'] !== null ? htmlspecialchars($row['weight']) . " kg" : "N/A"; ?></td> 
+
+                    <td><?php echo htmlspecialchars($row['request_date']); ?></td> 
+
+                    <td><?php echo nl2br(htmlspecialchars($row['reason_for_adoption'])); ?></td> 
+
+ 
+
+                    <td> 
+
+                        <?php if($status == "Pending"): ?> 
+
+                            <span class="status pending">Pending</span> 
+
+ 
+
+                        <?php elseif($status == "Approved"): ?> 
+
+                            <button 
+
+                                type="button" 
+
+                                class="status-popup-btn approved" 
+
+                                data-pet="<?php echo htmlspecialchars($row['pet_name'], ENT_QUOTES); ?>" 
+
+                                data-feedback="<?php echo htmlspecialchars($admin_feedback, ENT_QUOTES); ?>" 
+
+                                onclick="openApprovedModal(this)" 
+
+                            > 
+
+                                Approved 
+
+                            </button> 
+
+ 
+
+                        <?php else: ?> 
+
+                            <button 
+
+                                type="button" 
+
+                                class="status-popup-btn rejected" 
+
+                                data-pet="<?php echo htmlspecialchars($row['pet_name'], ENT_QUOTES); ?>" 
+
+                                data-feedback="<?php echo htmlspecialchars($admin_feedback, ENT_QUOTES); ?>" 
+
+                                onclick="openRejectedModal(this)" 
+
+                            > 
+
+                                Rejected 
+
+                            </button> 
+
+                        <?php endif; ?> 
+
+                    </td> 
+
+ 
+
+                    <td> 
+
+                        <?php if($has_documents): ?> 
+
+                            <span class="doc-status doc-submitted">Submitted</span> 
+
+                        <?php else: ?> 
+
+                            <span class="doc-status doc-missing">Not Submitted</span> 
+
+                        <?php endif; ?> 
+
+ 
+
+                        <?php if($status == "Pending"): ?> 
+
+                            <br> 
+
+                            <a class="upload-btn" href="upload_form.php?request_id=<?php echo $row['request_id']; ?>"> 
+
+                                <?php echo $has_documents ? "Update Documents" : "Upload Documents"; ?> 
+
+                            </a> 
+
+                        <?php endif; ?> 
+
+                    </td> 
+
+ 
+
+                    <td> 
+
+                        <a class="upload-btn" href="view_assessment.php?request_id=<?php echo $row['request_id']; ?>">View Assessment</a> 
+
+                    </td> 
+
+                </tr> 
+
+            <?php endwhile; ?> 
+
+        </table> 
+
+        <?php else: ?> 
+
+            <h3>You haven't submitted any adoption requests yet.</h3> 
+
+            <br> 
+
+            <a href="../available_pets.php" class="btn">Browse Pets</a> 
+
+        <?php endif; ?> 
+
+    </div> 
+
+</div> 
+
+ 
+
+<!-- Approved Modal --> 
+
+<div id="approvedModal" class="modal"> 
+
+    <div class="modal-content"> 
+
+        <span class="close-modal" onclick="closeApprovedModal()">&times;</span> 
+
+ 
+
+        <div class="modal-icon">🎉</div> 
+
+        <h2 class="modal-title approved">Congratulations!</h2> 
+
+ 
+
+        <p class="modal-message"> 
+
+            Your adoption request has been approved. 
+
+        </p> 
+
+ 
+
+        <p id="approvedPetText" class="modal-message"></p> 
+
+        <p id="approvedFeedbackText" class="modal-message"></p> 
+
+ 
+
+        <div class="modal-actions"> 
+
+            <button class="btn" type="button" onclick="closeApprovedModal()">Close</button> 
+
+        </div> 
+
+    </div> 
+
+</div> 
+
+ 
+
+<!-- Rejected Modal --> 
+
+<div id="rejectedModal" class="modal"> 
+
+    <div class="modal-content"> 
+
+        <span class="close-modal" onclick="closeRejectedModal()">&times;</span> 
+
+ 
+
+        <div class="modal-icon">❗</div> 
+
+        <h2 class="modal-title rejected">Rejected</h2> 
+
+ 
+
+        <p class="modal-message"> 
+
+            Your adoption request was not approved. 
+
+        </p> 
+
+ 
+
+        <p id="rejectedPetText" class="modal-message"></p> 
+
+        <p id="rejectedFeedbackText" class="modal-message"></p> 
+
+ 
+
+        <div class="modal-actions"> 
+
+            <button class="btn" type="button" onclick="closeRejectedModal()">Close</button> 
+
+        </div> 
+
+    </div> 
+
+</div> 
+
+ 
+
+<footer> 
+
+    <p>© PawConnect</p> 
+
+</footer> 
+
+ 
+
+<script> 
+
+function openApprovedModal(btn) { 
+
+    const petName = btn.getAttribute("data-pet") || ""; 
+
+    const feedback = btn.getAttribute("data-feedback") || ""; 
+
+ 
+
+    document.getElementById("approvedPetText").innerHTML = 
+
+        petName ? "<strong>Pet:</strong> " + petName : ""; 
+
+ 
+
+    document.getElementById("approvedFeedbackText").innerHTML = 
+
+        feedback ? "<strong>Message:</strong> " + feedback : "Your request was approved successfully."; 
+
+ 
+
+    document.getElementById("approvedModal").style.display = "block"; 
+
+} 
+
+ 
+
+function closeApprovedModal() { 
+
+    document.getElementById("approvedModal").style.display = "none"; 
+
+} 
+
+ 
+
+function openRejectedModal(btn) { 
+
+    const petName = btn.getAttribute("data-pet") || ""; 
+
+    const feedback = btn.getAttribute("data-feedback") || ""; 
+
+ 
+
+    document.getElementById("rejectedPetText").innerHTML = 
+
+        petName ? "<strong>Pet:</strong> " + petName : ""; 
+
+ 
+
+    document.getElementById("rejectedFeedbackText").innerHTML = 
+
+        feedback ? "<strong>Reason:</strong> " + feedback : "No reason was provided."; 
+
+ 
+
+    document.getElementById("rejectedModal").style.display = "block"; 
+
+} 
+
+ 
+
+function closeRejectedModal() { 
+
+    document.getElementById("rejectedModal").style.display = "none"; 
+
+} 
+
+ 
+
+window.onclick = function(event) { 
+
+    const approvedModal = document.getElementById("approvedModal"); 
+
+    const rejectedModal = document.getElementById("rejectedModal"); 
+
+ 
+
+    if (event.target === approvedModal) closeApprovedModal(); 
+
+    if (event.target === rejectedModal) closeRejectedModal(); 
+
+}; 
+
+</script> 
+
+ 
+
+</body> 
+
+</html> 
+
+ 
+
+ 

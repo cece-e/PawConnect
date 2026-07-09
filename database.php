@@ -1,8 +1,4 @@
 <?php
-// ==========================================
-// Pet Adoption System
-// Database Connection (Procedural MySQLi)
-// ==========================================
 
 $servername = "localhost";
 $username   = "root";
